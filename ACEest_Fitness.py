@@ -1,8 +1,11 @@
+import os
 from itertools import count
 
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
+
+APP_VERSION = os.environ.get("APP_VERSION", "1.0.0")
 
 members = []
 workouts = []
@@ -23,6 +26,9 @@ def home():
         "message": "Welcome to ACEest Fitness & Gym"
     })
 
+@app.route("/version")
+def version():
+   return jsonify({"version":APP_VERSION})
 
 @app.route("/health")
 def health():
