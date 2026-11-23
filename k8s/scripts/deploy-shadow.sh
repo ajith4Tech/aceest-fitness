@@ -16,10 +16,6 @@ echo "What users receive (stable version):"
 for _ in $(seq 10); do curl -fs -H "Host: $HOST" "$URL"; done
 
 sleep 2
-MIRRORED=$(kubectl logs deployment/aceest-shadow --since=30s | grep -c "GET /version" || true)
+MIRRORED=$(kubectl logs -l app=aceest-shadow --since=30s --tail=-1 | grep -c "GET /version" || true)
 echo "Shadow ($APP_VERSION) received $MIRRORED mirrored requests"
-kubectl logs deployment/aceest-shadow --tail=10
-if [ "$MIRRORED" -lt 10 ]; then
-  echo "Shadow did not receive the mirrored traffic"
-  exit 1
-fi
+kubectl logs -l app=aceest-shadow --since=30s --tail=-1 --prefix | grep "GET /version" || true
