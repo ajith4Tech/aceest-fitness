@@ -1,6 +1,6 @@
 import pytest
 
-from ACEest_Fitness import app, reset_data
+from ACEest_Fitness import APP_VERSION, app, reset_data
 
 
 @pytest.fixture
@@ -222,3 +222,7 @@ def test_member_ids_are_unique_after_delete(client):
     assert response.get_json()["id"] == 3
     assert client.get("/members/2").get_json()["name"] == "Mary"
 
+def test_version(client):
+    response = client.get("/version")
+    assert response.status_code == 200
+    assert response.get_json()["version"] == APP_VERSION
