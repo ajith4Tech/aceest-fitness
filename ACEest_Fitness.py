@@ -5,7 +5,7 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-APP_VERSION = os.environ.get("APP_VERSION", "1.1.0")
+APP_VERSION = os.environ.get("APP_VERSION", "1.2.0")
 
 PROGRAMS = {
     "FL": {
@@ -23,6 +23,7 @@ PROGRAMS = {
             "Dinner: Fish Curry + Millet Roti",
         ],
         "target_kcal": 2000,
+	"calorie_factor":22,
     },
     "MG": {
         "name": "Muscle Gain",
@@ -40,6 +41,7 @@ PROGRAMS = {
             "Dinner: Mutton Curry + Jeera Rice",
         ],
         "target_kcal": 3200,
+	"calorie_factor":35,
     },
     "BG": {
         "name": "Beginner",
@@ -52,6 +54,7 @@ PROGRAMS = {
             "Protein: 120g/day",
         ],
         "target_kcal": 2200,
+	"calorie_factor":26,
     },
 }
 
@@ -262,6 +265,30 @@ def get_program(code):
         }), 404
 
     return jsonify({"code": code.upper(), **program})
+
+
+@app.route("/programs/<code>/calories", methods=["GET"])
+def program_calories(code):
+    program = PROGRAMS.get(code.upper())
+
+    if not program:
+        return jsonify({
+            "error": "Program not found"
+        }), 404
+
+    weight = request.args.get("weight", type=float)
+
+    if weight is None or not 0 < weight <= 400:
+        return jsonify({
+            "error": "Weight must be a number between 0 and 400 kg"
+        }), 400
+
+    return jsonify({
+        "program": code.upper(),
+        "weight": weight,
+        "calorie_factor": program["calorie_factor"],
+        "daily_calories": int(weight * program["calorie_factor"])
+    })
 
 
 if __name__ == "__main__":

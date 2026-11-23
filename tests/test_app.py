@@ -255,3 +255,39 @@ def test_get_program_not_found(client):
 
     assert response.status_code == 404
     assert response.get_json()["error"] == "Program not found"
+
+def test_program_calories(client):
+    response = client.get("/programs/FL/calories?weight=70")
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert data["calorie_factor"] == 22
+    assert data["daily_calories"] == 1540
+
+
+def test_program_calories_lowercase_code(client):
+    response = client.get("/programs/mg/calories?weight=80")
+
+    assert response.status_code == 200
+    assert response.get_json()["daily_calories"] == 2800
+
+
+def test_program_calories_missing_weight(client):
+    response = client.get("/programs/FL/calories")
+
+    assert response.status_code == 400
+
+
+def test_program_calories_invalid_weight(client):
+    for weight in ["-5", "0", "abc", "500", "nan"]:
+        response = client.get(f"/programs/FL/calories?weight={weight}")
+
+        assert response.status_code == 400
+
+
+def test_program_calories_unknown_program(client):
+    response = client.get("/programs/XX/calories?weight=70")
+
+    assert response.status_code == 404
