@@ -1,6 +1,6 @@
 import pytest
 
-from ACEest_Fitness import APP_VERSION, app, reset_data
+from ACEest_Fitness import APP_VERSION, app, progress, reset_data
 
 
 @pytest.fixture
@@ -291,3 +291,97 @@ def test_program_calories_unknown_program(client):
     response = client.get("/programs/XX/calories?weight=70")
 
     assert response.status_code == 404
+
+def add_john(client):
+    client.post("/members", json={"name": "John", "age": 25})
+
+
+def test_add_progress(client):
+    add_john(client)
+
+    response = client.post(
+        "/members/1/progress",
+        json={"week": "2026-W48", "adherence": 80}
+    )
+
+    assert response.status_code == 201
+    assert response.get_json() == {
+        "member_id": 1,
+        "week": "2026-W48",
+        "adherence": 80
+    }
+
+
+def test_progress_summary(client):
+    add_john(client)
+    client.post("/members/1/progress", json={"week": "2026-W49", "adherence": 90})
+    client.post("/members/1/progress", json={"week": "2026-W48", "adherence": 70})
+
+    response = client.get("/members/1/progress")
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert data["weeks_logged"] == 2
+    assert data["average_adherence"] == 80.0
+    assert [entry["week"] for entry in data["entries"]] == ["2026-W48", "2026-W49"]
+
+
+def test_progress_empty(client):
+    add_john(client)
+
+    data = client.get("/members/1/progress").get_json()
+
+    assert data["weeks_logged"] == 0
+    assert data["average_adherence"] is None
+
+
+def test_progress_member_not_found(client):
+    response = client.post(
+        "/members/999/progress",
+        json={"week": "2026-W48", "adherence": 80}
+    )
+
+    assert response.status_code == 404
+    assert client.get("/members/999/progress").status_code == 404
+
+
+def test_progress_invalid_input(client):
+    add_john(client)
+
+    invalid_bodies = [
+        {"week": "48", "adherence": 80},
+        {"week": "2026-W48", "adherence": 150},
+        {"week": "2026-W48", "adherence": "80"},
+        {"week": "2026-W48", "adherence": True},
+        {"adherence": 80},
+    ]
+
+    for body in invalid_bodies:
+        response = client.post("/members/1/progress", json=body)
+
+        assert response.status_code == 400
+
+    assert client.post("/members/1/progress").status_code == 400
+
+
+def test_progress_duplicate_week(client):
+    add_john(client)
+    client.post("/members/1/progress", json={"week": "2026-W48", "adherence": 80})
+
+    response = client.post(
+        "/members/1/progress",
+        json={"week": "2026-W48", "adherence": 60}
+    )
+
+    assert response.status_code == 409
+
+
+def test_progress_removed_with_member(client):
+    add_john(client)
+    client.post("/members/1/progress", json={"week": "2026-W48", "adherence": 80})
+
+    client.delete("/members/1")
+
+    assert progress == []
