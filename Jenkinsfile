@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE       = "aceest-fitness"
+        IMAGE       = "ajith0b1m/aceest-fitness"
         APP_VERSION = "1.0.0"
     }
 
@@ -59,9 +59,24 @@ pipeline {
         stage('Test in Container') {
             steps { sh 'docker run --rm $IMAGE:$APP_VERSION python -m pytest -v' }
         }
+	stage('Push to Docker Hub') {
+    steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub',
+                         usernameVariable: 'DH_USER', passwordVariable: 'DH_TOKEN')]) {
+            sh '''
+                echo "$DH_TOKEN" | docker login -u "$DH_USER" --password-stdin
+                docker push $IMAGE:$APP_VERSION
+                docker tag $IMAGE:$APP_VERSION $IMAGE:latest
+                docker push $IMAGE:latest
+            '''
+        }
+    }
+}
     }
 
     post {
-        always { archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true }
+        always { archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true 
+	sh 'docker logout || true'
+	}
     }
 }
