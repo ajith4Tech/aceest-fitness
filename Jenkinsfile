@@ -25,9 +25,31 @@ pipeline {
         }
         stage('Unit Tests') {
             steps {
-                sh '. venv/bin/activate && mkdir -p reports && python -m pytest --junitxml=reports/junit.xml'
+                sh '''
+                    . venv/bin/activate
+                    mkdir -p reports
+                    python -m pytest --junitxml=reports/junit.xml \
+                        --cov=ACEest_Fitness --cov-report=xml:reports/coverage.xml
+                '''
             }
             post { always { junit 'reports/junit.xml' } }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def scannerHome = tool 'sonar-scanner'
+                    withSonarQubeEnv('sonarqube') {
+                        sh "${scannerHome}/bin/sonar-scanner"
+                    }
+                }
+            }
+        }
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
         }
         stage('Docker Build') {
             steps {
