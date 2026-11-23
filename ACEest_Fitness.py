@@ -1,9 +1,20 @@
+from itertools import count
+
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
 members = []
 workouts = []
+_member_ids = count(1)
+_workout_ids = count(1)
+
+def reset_data():
+    global _member_ids, _workout_ids
+    members.clear()
+    workouts.clear()
+    _member_ids = count(1)
+    _workout_ids = count(1)
 
 
 @app.route("/")
@@ -46,7 +57,7 @@ def add_member():
         }), 400
 
     member = {
-        "id": len(members) + 1,
+        "id": next(_member_ids),
         "name": name,
         "age": age
     }
@@ -169,7 +180,7 @@ def add_workout():
         }), 404
 
     workout = {
-        "id": len(workouts) + 1,
+        "id": next(_workout_ids),
         "member_id": member_id,
         "exercise": exercise,
         "duration": duration
@@ -180,5 +191,7 @@ def add_workout():
     return jsonify(workout), 201
 
 
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+

@@ -1,6 +1,6 @@
 import pytest
 
-from app import app, members, workouts
+from ACEest_Fitness import app, reset_data
 
 
 @pytest.fixture
@@ -8,8 +8,7 @@ def client():
     app.config["TESTING"] = True
 
     with app.test_client() as client:
-        members.clear()
-        workouts.clear()
+        reset_data()
         yield client
 
 
@@ -214,3 +213,12 @@ def test_get_workouts_empty(client):
 
     assert response.status_code == 200
     assert response.get_json() == []
+
+def test_member_ids_are_unique_after_delete(client):
+    client.post("/members", json={"name": "John", "age": 25})
+    client.post("/members", json={"name": "Mary", "age": 30})
+    client.delete("/members/1")
+    response = client.post("/members", json={"name": "Bob", "age": 40})
+    assert response.get_json()["id"] == 3
+    assert client.get("/members/2").get_json()["name"] == "Mary"
+
