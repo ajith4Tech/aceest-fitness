@@ -59,24 +59,54 @@ pipeline {
         stage('Test in Container') {
             steps { sh 'docker run --rm $IMAGE:$APP_VERSION python -m pytest -v' }
         }
-	stage('Push to Docker Hub') {
-    steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub',
-                         usernameVariable: 'DH_USER', passwordVariable: 'DH_TOKEN')]) {
-            sh '''
-                echo "$DH_TOKEN" | docker login -u "$DH_USER" --password-stdin
-                docker push $IMAGE:$APP_VERSION
-                docker tag $IMAGE:$APP_VERSION $IMAGE:latest
-                docker push $IMAGE:latest
-            '''
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub',
+                                 usernameVariable: 'DH_USER', passwordVariable: 'DH_TOKEN')]) {
+                    sh '''
+                        echo "$DH_TOKEN" | docker login -u "$DH_USER" --password-stdin
+                        docker push $IMAGE:$APP_VERSION
+                        docker tag $IMAGE:$APP_VERSION $IMAGE:latest
+                        docker push $IMAGE:latest
+                    '''
+                }
+            }
         }
-    }
-}
+        stage('Deploy to Kubernetes') {
+            steps {
+                withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
+                    sh '''
+                        kubectl apply -f k8s/rolling-update/service.yaml
+                        kubectl set image deployment/aceest-fitness aceest-fitness=$IMAGE:$APP_VERSION
+                        kubectl annotate deployment/aceest-fitness --overwrite \
+                            kubernetes.io/change-cause="Jenkins build $BUILD_NUMBER: version $APP_VERSION"
+                        kubectl rollout status deployment/aceest-fitness --timeout=120s \
+                            || (kubectl rollout undo deployment/aceest-fitness && exit 1)
+                    '''
+                }
+            }
+        }
+        stage('Smoke Test') {
+            steps {
+                sh '''
+                    curl -fs http://192.168.49.2:30080/health
+                    curl -fs http://192.168.49.2:30080/version | grep -q "$APP_VERSION"
+                '''
+            }
+            post {
+                failure {
+                    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
+                        sh 'kubectl rollout undo deployment/aceest-fitness'
+                    }
+                }
+            }
+        }
     }
 
     post {
-        always { archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true 
-	sh 'docker logout || true'
-	}
+        always {
+            archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
+            sh 'docker logout || true'
+        }
     }
 }
