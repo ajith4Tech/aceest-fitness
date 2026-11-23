@@ -1,11 +1,12 @@
 import os
+import re
 from itertools import count
 
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-APP_VERSION = os.environ.get("APP_VERSION", "1.2.0")
+APP_VERSION = os.environ.get("APP_VERSION", "2.0.0")
 
 PROGRAMS = {
     "FL": {
@@ -60,6 +61,7 @@ PROGRAMS = {
 
 members = []
 workouts = []
+progress = []
 _member_ids = count(1)
 _workout_ids = count(1)
 
@@ -67,6 +69,7 @@ def reset_data():
     global _member_ids, _workout_ids
     members.clear()
     workouts.clear()
+    progress.clear()
     _member_ids = count(1)
     _workout_ids = count(1)
 
@@ -152,7 +155,7 @@ def delete_member(member_id):
         }), 404
 
     members.remove(member)
-
+    progress[:] = [entry for entry in progress if entry["member_id"] != member_id]
     return jsonify({
         "message": "Member deleted successfully"
     })
@@ -288,6 +291,84 @@ def program_calories(code):
         "weight": weight,
         "calorie_factor": program["calorie_factor"],
         "daily_calories": int(weight * program["calorie_factor"])
+    })
+
+WEEK_PATTERN = re.compile(r"^\d{4}-W\d{2}$")
+
+
+def find_member(member_id):
+    return next(
+        (member for member in members if member["id"] == member_id),
+        None
+    )
+
+
+@app.route("/members/<int:member_id>/progress", methods=["POST"])
+def add_progress(member_id):
+    if not find_member(member_id):
+        return jsonify({
+            "error": "Member not found"
+        }), 404
+
+    data = request.get_json(silent=True)
+
+    if not data:
+        return jsonify({"error": "Request body is required"}), 400
+
+    week = data.get("week")
+    adherence = data.get("adherence")
+
+    if not isinstance(week, str) or not WEEK_PATTERN.match(week):
+        return jsonify({
+            "error": "Week must be in the format YYYY-Www, e.g. 2026-W48"
+        }), 400
+
+    if (not isinstance(adherence, int) or isinstance(adherence, bool)
+            or not 0 <= adherence <= 100):
+        return jsonify({
+            "error": "Adherence must be an integer between 0 and 100"
+        }), 400
+
+    if any(entry["member_id"] == member_id and entry["week"] == week
+           for entry in progress):
+        return jsonify({
+            "error": "Progress for this week is already logged"
+        }), 409
+
+    entry = {
+        "member_id": member_id,
+        "week": week,
+        "adherence": adherence
+    }
+
+    progress.append(entry)
+
+    return jsonify(entry), 201
+
+
+@app.route("/members/<int:member_id>/progress", methods=["GET"])
+def get_progress(member_id):
+    if not find_member(member_id):
+        return jsonify({
+            "error": "Member not found"
+        }), 404
+
+    entries = sorted(
+        (entry for entry in progress if entry["member_id"] == member_id),
+        key=lambda entry: entry["week"]
+    )
+
+    average = None
+    if entries:
+        average = round(
+            sum(entry["adherence"] for entry in entries) / len(entries), 1
+        )
+
+    return jsonify({
+        "member_id": member_id,
+        "weeks_logged": len(entries),
+        "average_adherence": average,
+        "entries": entries
     })
 
 
