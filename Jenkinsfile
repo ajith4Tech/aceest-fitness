@@ -10,6 +10,12 @@ pipeline {
         pollSCM('H/2 * * * *')      // check GitHub about every 2 minutes
     }
 
+    parameters {
+        choice(name: 'STRATEGY',
+               choices: ['rolling', 'blue-green', 'canary', 'shadow'],
+               description: 'Kubernetes deployment strategy (polling builds use rolling)')
+    }
+
     stages {
         stage('Install') {
             steps {
@@ -72,32 +78,11 @@ pipeline {
                 }
             }
         }
-        stage('Deploy to Kubernetes') {
+        stage('Deploy') {
             steps {
+                echo "Deployment strategy: ${params.STRATEGY}"
                 withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
-                    sh '''
-                        kubectl apply -f k8s/rolling-update/service.yaml
-                        kubectl set image deployment/aceest-fitness aceest-fitness=$IMAGE:$APP_VERSION
-                        kubectl annotate deployment/aceest-fitness --overwrite \
-                            kubernetes.io/change-cause="Jenkins build $BUILD_NUMBER: version $APP_VERSION"
-                        kubectl rollout status deployment/aceest-fitness --timeout=120s \
-                            || (kubectl rollout undo deployment/aceest-fitness && exit 1)
-                    '''
-                }
-            }
-        }
-        stage('Smoke Test') {
-            steps {
-                sh '''
-                    curl -fs http://192.168.49.2:30080/health
-                    curl -fs http://192.168.49.2:30080/version | grep -q "$APP_VERSION"
-                '''
-            }
-            post {
-                failure {
-                    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
-                        sh 'kubectl rollout undo deployment/aceest-fitness'
-                    }
+                    sh "bash k8s/scripts/deploy-${params.STRATEGY}.sh"
                 }
             }
         }
