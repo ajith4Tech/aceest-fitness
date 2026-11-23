@@ -8,7 +8,7 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py .
+COPY ACEest_Fitness.py .
 COPY tests/ tests/
 
 RUN chown -R appuser:appuser /app
@@ -17,4 +17,5 @@ USER appuser
 
 EXPOSE 5000
 
-CMD ["python", "app.py"]
+CMD ["python", "ACEest_Fitness.py"]
+
