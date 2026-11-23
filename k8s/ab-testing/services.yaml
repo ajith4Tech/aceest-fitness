@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-ab-a
+spec:
+  selector:
+    app: aceest-stable
+  ports:
+    - port: 80
+      targetPort: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-ab-b
+spec:
+  selector:
+    app: aceest-new
+  ports:
+    - port: 80
+      targetPort: 5000
