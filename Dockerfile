@@ -16,7 +16,7 @@ RUN chown -R appuser:appuser /app
 
 USER appuser
 
-ARG APP_VERSION=1.0.0
+ARG APP_VERSION=1.1.0
 ENV APP_VERSION=$APP_VERSION
 
 EXPOSE 5000

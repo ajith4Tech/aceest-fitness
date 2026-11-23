@@ -226,3 +226,32 @@ def test_version(client):
     response = client.get("/version")
     assert response.status_code == 200
     assert response.get_json()["version"] == APP_VERSION
+
+def test_list_programs(client):
+    response = client.get("/programs")
+
+    assert response.status_code == 200
+
+    codes = [program["code"] for program in response.get_json()]
+
+    assert codes == ["FL", "MG", "BG"]
+
+
+def test_get_program_case_insensitive(client):
+    response = client.get("/programs/fl")
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert data["code"] == "FL"
+    assert data["name"] == "Fat Loss"
+    assert data["target_kcal"] == 2000
+    assert len(data["workout"]) == 5
+
+
+def test_get_program_not_found(client):
+    response = client.get("/programs/XX")
+
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "Program not found"
